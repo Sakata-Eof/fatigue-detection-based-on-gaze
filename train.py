@@ -5,13 +5,13 @@ import logging
 import seaborn as sns
 
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import classification_report, accuracy_score, f1_score
 
 import torch
 import torch.nn as nn
@@ -30,17 +30,17 @@ class GazeCNN(nn.Module):
     def __init__(self, in_channels):
         super(GazeCNN, self).__init__()
         # 第一个卷积层，增加通道数和卷积核大小
-        self.conv1 = nn.Conv1d(in_channels, 128, kernel_size=5, stride=1, padding=2)  # 更大通道数和卷积核
-        self.bn1 = nn.BatchNorm1d(128)  # Batch Normalization
-        self.conv2 = nn.Conv1d(128, 256, kernel_size=5, stride=1, padding=2)  # 更大通道数
-        self.bn2 = nn.BatchNorm1d(256)  # Batch Normalization
-        self.conv3 = nn.Conv1d(256, 512, kernel_size=5, stride=1, padding=2)  # 第三个卷积层，通道数更大
-        self.bn3 = nn.BatchNorm1d(512)  # Batch Normalization
+        self.conv1 = nn.Conv1d(in_channels, 64, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm1d(64)  # Batch Normalization
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=5, stride=1, padding=2)
+        self.bn2 = nn.BatchNorm1d(128)  # Batch Normalization
+        self.conv3 = nn.Conv1d(128, 256, kernel_size=5, stride=1, padding=2)
+        self.bn3 = nn.BatchNorm1d(256)  # Batch Normalization
         self.pool = nn.AdaptiveMaxPool1d(1)  # 池化层，降维
         self.dropout = nn.Dropout(0.5)  # Dropout 防止过拟合
-        self.fc1 = nn.Linear(512, 256)  # 全连接层
-        self.fc2 = nn.Linear(256, 128)  # 全连接层
-        self.fc3 = nn.Linear(128, 1)  # 输出层
+        self.fc1 = nn.Linear(256, 128)  # 全连接层
+        self.fc2 = nn.Linear(128, 64)  # 全连接层
+        self.fc3 = nn.Linear(64, 1)  # 输出层
 
     def forward(self, x):
         # 前向传播，逐层处理
@@ -95,12 +95,15 @@ def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torc
 
     model = GazeCNN(in_channels=X_train.shape[1]).to(device)
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)  # L2正则
+    # Early Stopping
+    best_val_loss = float('inf')
+    patience = 10
+    patience_counter = 0
     # Learning Rate Scheduler (StepLR)
     scheduler = StepLR(optimizer, step_size=20, gamma=0.5)  # 每10个epoch降低学习率
 
-    for epoch in range(100):  # 增加 epoch 数量
+    for epoch in range(100):
         model.train()
         train_loss = 0.0
         correct = 0
@@ -149,11 +152,23 @@ def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torc
         print(f"Epoch [{epoch+1}/100], "
               f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.4f}, "
               f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.4f}")
+        # Early Stopping判断
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+            torch.save(model.state_dict(), "best_model.pt")
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                logging.info(f"Early stopping at epoch {epoch+1}")
+                break
 
         # 调整学习率
         scheduler.step()
 
     # 最终测试
+    model.load_state_dict(torch.load("best_model.pt"))
     model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
@@ -164,11 +179,114 @@ def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torc
             all_labels.extend(yb.numpy())
 
     all_preds = np.array(all_preds) > 0.5
-    acc = accuracy_score(all_labels, all_preds)
-    logging.info(f"Final CNN Test Accuracy: {acc:.4f}")
+    f1 = f1_score(all_labels, all_preds)
+    logging.info(f"Final CNN Test F1-score: {f1:.4f}")
 
-    return acc
+    return f1
+# 交叉验证版CNN训练
+def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" if torch.cuda.is_available() else "cpu", n_splits=5):
+    X_seq, y_seq = reshape_for_cnn(X, y, window_size, video_boundaries)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    f1_scores = []
 
+    for fold, (train_idx, val_idx) in enumerate(kf.split(X_seq)):
+        print(f"\nCNN Fold {fold+1}/{n_splits}")
+        # 划分数据
+        X_train, X_val = X_seq[train_idx], X_seq[val_idx]
+        y_train, y_val = y_seq[train_idx], y_seq[val_idx]
+
+        train_ds = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
+        val_ds = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32))
+        train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
+        val_loader = DataLoader(val_ds, batch_size=64)
+
+        model = GazeCNN(in_channels=X_train.shape[1]).to(device)
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+        scheduler = StepLR(optimizer, step_size=20, gamma=0.5)
+
+        best_val_loss = float('inf')
+        patience = 10
+        patience_counter = 0
+        best_model_path = f"best_model_fold_{fold}.pt"
+
+        for epoch in range(100):
+            model.train()
+            train_loss = 0.0
+            correct = 0
+            total = 0
+            for xb, yb in train_loader:
+                xb, yb = xb.to(device), yb.to(device)
+                optimizer.zero_grad()
+                preds = model(xb)
+                loss = criterion(preds, yb)
+                loss.backward()
+                optimizer.step()
+
+                train_loss += loss.item() * xb.size(0)
+                predicted = (preds > 0.5).float()
+                correct += (predicted == yb).sum().item()
+                total += yb.size(0)
+            train_loss /= total
+            train_acc = correct / total
+            # 验证
+            model.eval()
+            val_loss = 0.0
+            total = 0
+            correct = 0
+            with torch.no_grad():
+                for xb, yb in val_loader:
+                    xb, yb = xb.to(device), yb.to(device)
+                    preds = model(xb)
+                    loss = criterion(preds, yb)
+
+                    val_loss += loss.item() * xb.size(0)
+                    predicted = (preds > 0.5).float()
+                    correct += (predicted == yb).sum().item()
+                    total += yb.size(0)
+            val_loss /= total
+            val_acc = correct / total
+
+            # 记录日志
+            logging.info(f"Epoch [{epoch+1}/100] in fold [{fold+1}/{n_splits}], "
+                         f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.4f}, "
+                         f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.4f}")
+            print(f"Epoch [{epoch+1}/100] in fold [{fold+1}/{n_splits}], "
+                  f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.4f}, "
+                  f"Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.4f}")
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                torch.save(model.state_dict(), best_model_path)
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {epoch+1} in fold {fold+1}")
+                    break
+            scheduler.step()
+
+        # 测试本fold
+        model.load_state_dict(torch.load(best_model_path))
+        model.eval()
+        all_preds, all_labels = [], []
+        with torch.no_grad():
+            for xb, yb in val_loader:
+                xb = xb.to(device)
+                preds = model(xb)
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(yb.numpy())
+        all_preds = np.array(all_preds) > 0.5
+        f1 = f1_score(all_labels, all_preds)
+        print(f"Fold {fold+1} F1-score: {f1:.4f}")
+        f1_scores.append(f1)
+        # 清理模型文件
+        try:
+            os.remove(best_model_path)
+        except:
+            pass
+
+    print(f"\nAverage CNN F1-score across {n_splits} folds: {np.mean(f1_scores):.4f}")
+    return np.mean(f1_scores)
 
 def PreProcess(X, y, measure=0, standardize=True):
     """
@@ -273,18 +391,17 @@ def LoadData(fnf, dataPath):# 加载数据
 
 if __name__ == '__main__':
     dataPath = 'output'
-
     dataF = LoadData("f", dataPath)
     label = [1] * len(dataF) #添加标签，疲劳为1
 
     dataNF = LoadData("nf", dataPath)
     label += [0] * len(dataNF) #不疲劳为0
-    all_accuracies = []  # 用于存储所有模型在不同方法下的准确率
+    all_scores = []  # 用于存储所有模型在不同方法下的分数
     for i in range(4): # 4种数据预处理方式
         X, y, video_boundaries = PreProcess(dataF + dataNF, label, measure=i, standardize=True) # 预处理， measure取0-3，
                                                                               # 0-不处理，1-相对位移，2-相对位移+上一点信息，3-速度、加速度+注视点坐标
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)# 测试集占0.3
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)# 测试集占0.5
 
         models = {
             'SVC': SVC(),
@@ -316,51 +433,55 @@ if __name__ == '__main__':
         }
 
         best_models = {}
-        model_accuracies = []
+        model_scores = []
         for model_name, model in models.items(): # 对比不同模型
             logging.info(f"\nPerforming grid search for {model_name}...")
-            grid_search = GridSearchCV(model, param_grids[model_name], cv=5, scoring='accuracy', verbose=2)  # 超参数调优，verbose=2 显示进度
+            grid_search = GridSearchCV(model, param_grids[model_name], cv=5, scoring='f1', verbose=2)  # 超参数调优，verbose=2 显示进度
 
             grid_search.fit(X_train, y_train)
 
-            logging.info(f"Best parameters for {model_name} in measure {i}: {grid_search.best_params_}")
-            logging.info(f"Best cross-validation score for {model_name} in measure {i}: {grid_search.best_score_}")
+            logging.info(f"Best parameters for {model_name} in measure {i+1}: {grid_search.best_params_}")
+            logging.info(f"Best cross-validation score for {model_name} in measure {i+1}: {grid_search.best_score_}")
 
             best_model = grid_search.best_estimator_
             best_models[model_name] = best_model
 
             y_pred = best_model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            logging.info(f"Accuracy for {model_name} in measure {i}: {accuracy_score(y_test, y_pred)}")
-            logging.info(f"Classification Report for {model_name} in measure {i}:\n{classification_report(y_test, y_pred)}")
-            model_accuracies.append((f"{model_name}-{i}", accuracy))  # 保存模型和方法编号
+            f1 = f1_score(y_test, y_pred)
+            logging.info(f"F1-score for {model_name} in measure {i+1}: {f1}")
+            print(f"F1-score for {model_name} in measure {i+1}: {f1}")
+            logging.info(f"Classification Report for {model_name} in measure {i+1}:\n{classification_report(y_test, y_pred)}")
+            print(f"Classification Report for {model_name} in measure {i+1}:\n{classification_report(y_test, y_pred)}")
+            model_scores.append((f"{model_name}-{i+1}", f1))  # 保存模型和方法编号
         logging.info("\n--- Model Comparison ---")
         for model_name, model in best_models.items():
             y_pred = model.predict(X_test)
-            logging.info(f"{model_name} Accuracy in measure {i}: {accuracy_score(y_test, y_pred)}")
+            logging.info(f"{model_name} F1-score in measure {i+1}: {f1_score(y_test, y_pred)}")
+            print(f"{model_name} F1-score in measure {i+1}: {f1_score(y_test, y_pred)}")
 
         logging.info("Training CNN model...")
         print("Training CNN model...")
         # 使用预处理返回的 video_boundaries
-        acc = train_cnn(X, y, window_size=10, video_boundaries=video_boundaries)
-        all_accuracies.append((f"CNN-{i}", acc))
-        logging.info(f"Accuracy for CNN in measure {i}: {acc}")
+        f1 = train_cnn_kfold(X, y, window_size=10, video_boundaries=video_boundaries)
+        all_scores.append((f"CNN-{i+1}", f1))
+        logging.info(f"F1-score for CNN in measure {i+1}: {f1}")
+        print(f"F1-score for CNN in measure {i+1}: {f1}")
 
-        all_accuracies.extend(model_accuracies)  # 将当前测量结果加入所有结果
-        logging.info(f"measure {i} Training complete.")
+        all_scores.extend(model_scores)  # 将当前测量结果加入所有结果
+        logging.info(f"measure {i+1} Training complete.")
 
-    all_accuracies.sort(key=lambda x: x[1], reverse=True)  # 按准确率排序
-    names = [x[0] for x in all_accuracies]
-    accuracies = [x[1] for x in all_accuracies]
+    all_scores.sort(key=lambda x: x[1], reverse=True)  # 按分数排序
+    names = [x[0] for x in all_scores]
+    scores = [x[1] for x in all_scores]
 
     # 使用 Seaborn 绘制条形图
     plt.figure(figsize=(12, 8))
-    sns.barplot(x=names, y=accuracies, palette="Blues_d")
-    plt.title('Model Comparison - Accuracy for Different Methods', fontsize=16)
+    sns.barplot(x=names, y=scores, palette="Blues_d")
+    plt.title('Model Comparison - F1-score for Different Methods', fontsize=16)
     plt.xlabel('Model and Method', fontsize=12)
-    plt.ylabel('Accuracy', fontsize=12)
+    plt.ylabel('F1-score', fontsize=12)
     plt.xticks(rotation=45, ha="right")
-    for i, v in enumerate(accuracies):
+    for i, v in enumerate(scores):
         plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10)
     plt.tight_layout()
     plt.show()
