@@ -3,13 +3,11 @@ import face_recognition
 import cv2
 import numpy as np
 
-frameInterval = 1 #每隔**帧取一帧
-root = "videos"
-outRoot = "pictures"
+frameInterval = 1 #每几帧取一帧
+root = "videos" # 输入目录
+outRoot = "pictures" # 输出目录，不要更改
 def CropImg(image, x, y, width, height):
-    """
-    使用 OpenCV 根据给定的左上角坐标 (x, y) 和裁剪的宽度 (width)、高度 (height) 来裁剪图像。
-    """
+    # 使用 OpenCV 根据给定的左上角坐标 (x, y) 和裁剪的宽度 (width)、高度 (height) 来裁剪图像。
     return image[y:y+height, x:x+width]
 
 
@@ -19,10 +17,8 @@ def sliceV(sourcePath, fnf):
     persons = os.listdir(sourcePath)
     persons.sort()
     for person in persons:
+        # 逐人切
         person = person.split("_")[0]
-        if person != '0':
-            continue
-
         imgOutRoot = os.path.join(outRoot, person)
         if not os.path.exists(imgOutRoot):
             os.makedirs(imgOutRoot)
@@ -30,25 +26,24 @@ def sliceV(sourcePath, fnf):
         if not os.path.exists(os.path.join(imgOutRoot, fnf)):
             os.makedirs(os.path.join(imgOutRoot, fnf))
         outfile = open(os.path.join(imgOutRoot,fnf, "rects.txt"), 'w')
+        # 使用cv2读取视频，手机录制竖屏视频可能有问题，自行转格式
         cap = cv2.VideoCapture(os.path.join(sourcePath, person + "_"+fnf+".mp4"))
-
         if not cap.isOpened():
             print("Error opening video stream or file")
             exit()
         frameCount = 0
         while cap.isOpened():
             ret, frame = cap.read()
-
             if not ret:
                 break
-
             if frameCount % frameInterval != 0:
+                # 每几帧跳过
                 frameCount += 1
                 continue
             (h, w) = frame.shape[:2]
             print(f"Start Processing frame {frameCount}")
+            # 使用 face_recognition 识别人脸
             faces = face_recognition.face_locations(frame)
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if len(faces) == 0:
                 frameCount += 1
                 print("No face found")
@@ -62,41 +57,43 @@ def sliceV(sourcePath, fnf):
                 frameCount += 1
                 print("No face found")
                 continue
+            # 使用face_recognition 识别眼部特征点
             left = face_recognition.face_landmarks(frame)[0]['left_eye']
             right = face_recognition.face_landmarks(frame)[0]['right_eye']
-            lcx = 0 # 左眼中央坐标，取六个特征向量的平均
+            # 左眼框选
+            lcx = 0
             lcy = 0
             lew = left[3][0] - left[0][0]
-            lew = int(1.5*lew)#放大截取范围
-            leh = int((lew / 60) *36)#按比例计算眼部高度
-
+            lew = int(1.5*lew)# 放大截取范围
+            leh = int((lew / 60) *36)# 按比例计算眼部高度
             for x,y in left:
+                # 左眼中央坐标，取六个特征向量的平均
                 lcx += x
                 lcy += y
             lcx = int(lcx/len(left))
             lcy = int(lcy/len(left))
             lex = int(lcx-lew/2)
             ley = int(lcy-leh/2)
-
+            #右眼框选
             rcx =0
             rcy =0
             rew = right[3][0] - right[0][0]
             rew = int(1.5 * rew)
             reh = int((rew / 60) * 36)
             for x,y in right:
+                # 右眼中央坐标，取六个特征向量的平均
                 rcx +=x
                 rcy +=y
             rcx = int(rcx/len(right))
             rcy = int(rcy/len(right))
             rex = int(rcx - rew/2)
             rey = int(rcy - reh/2)
-
+            # 裁切图像并保存
             faceImage = CropImg(frame, fx, fy, fw, fh)
             ImageOutRoot = os.path.join(imgOutRoot, fnf, str(frameCount))
             if not os.path.exists(ImageOutRoot):
                 os.makedirs(ImageOutRoot)
             cv2.imwrite(os.path.join(ImageOutRoot, "face.jpg"), faceImage)
-
             leImage = CropImg(frame, lex, ley, lew, leh)
             reImage = CropImg(frame, rex, rey, rew, reh)
             cv2.imwrite(os.path.join(ImageOutRoot, "left.jpg"), leImage)

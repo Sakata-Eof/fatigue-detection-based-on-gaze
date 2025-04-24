@@ -25,7 +25,7 @@ def normalize_box(box, frame_size):
             int(x) / int(frame_size[0]), int(y) / int(frame_size[1])]
 
 def preprocess_image(img, target_size, flip=False):
-    """图像预处理函数"""
+    # 图像预处理函数， flip：是否水平翻转
     img = cv2.resize(img, target_size)
     if flip:
         img = cv2.flip(img, 1)  # 水平翻转
@@ -39,6 +39,7 @@ def GazeEstimationPerVideo(path):
     for line in lines:
         frameCount = line.split(" ")[0]
         print(f"frameCount: {frameCount}, gaze: ", end="")
+        # 矩形框标准化
         rects = line.split(" ")[1:]
         rects = np.array(
             normalize_box(tuple(rects[0:4]), tuple(rects[-2:]))+
@@ -46,6 +47,7 @@ def GazeEstimationPerVideo(path):
             normalize_box(tuple(rects[8:12]), tuple(rects[-2:]))
         ).astype(np.float32)
         rects = torch.from_numpy(rects).unsqueeze(0).to(device)
+        # 图像预处理
         face = cv2.imread(os.path.join(path, frameCount, "face.jpg"))
         face = preprocess_image(face, target_size=(224,224)).to(device)
         left = cv2.imread(os.path.join(path, frameCount, "left.jpg"))
@@ -53,16 +55,19 @@ def GazeEstimationPerVideo(path):
         right = cv2.imread(os.path.join(path, frameCount, "right.jpg"))
         right = preprocess_image(right, target_size=(112,112), flip = True).to(device)#右眼翻转
         with torch.no_grad():
+            # 生成注视点坐标
             gaze = net(left, right, face, rects)
             gaze = gaze[0].cpu().numpy()
         print(gaze)
         outFile = open(os.path.join(outputPath, "gaze.txt"), "a")
+        # 保存格式：帧  注视点坐标x  注视点坐标y
         outFile.write(" ".join([frameCount, str(gaze[0]), str(gaze[1])])+"\n")
 
 if __name__ == '__main__':
     persons = os.listdir(picturePath)
     persons.sort()
     for person in persons:
+        # 逐人处理，先处理疲劳再不疲劳
         print(f"Processing person No.{person}, fatigue.")
         outputPath = os.path.join("output", person,"f")
         if not os.path.exists(outputPath):

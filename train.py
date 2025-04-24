@@ -17,6 +17,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim.lr_scheduler import StepLR
+
 # 配置日志
 logging.basicConfig(
     filename='model_training.log',
@@ -51,22 +53,22 @@ class GazeCNN(nn.Module):
         x = torch.relu(self.fc2(x))  # 全连接 + 激活
         return torch.sigmoid(self.fc3(x)).squeeze(1)  # 输出层，用 sigmoid 函数二分类
 
-
-# 改进后的 reshape_for_cnn，支持按视频分段划窗
+# 按视频分段划窗
 # video_boundaries: 每个样本属于哪个视频的分段标识，与 X、y 长度一致
-
 def reshape_for_cnn(X, y, window_size=60, video_boundaries=None):
     X_seq, y_seq = [], []
     if video_boundaries is None:
-        video_boundaries = [0] * len(X)  # 所有样本属于同一视频
-
+        # 所有样本属于同一视频
+        video_boundaries = [0] * len(X)
     current_video = video_boundaries[0]
     start = 0
     for i in range(1, len(X)):
         if video_boundaries[i] != current_video:
+            # 切分视频段
             segment_X = X[start:i]
             segment_y = y[start:i]
             for j in range(len(segment_X) - window_size):
+                #划分窗口
                 X_seq.append(segment_X[j:j + window_size])
                 y_seq.append(segment_y[j + window_size])
             current_video = video_boundaries[i]
@@ -77,14 +79,10 @@ def reshape_for_cnn(X, y, window_size=60, video_boundaries=None):
     for j in range(len(segment_X) - window_size):
         X_seq.append(segment_X[j:j + window_size])
         y_seq.append(segment_y[j + window_size])
-
     X_seq = np.array(X_seq)
     y_seq = np.array(y_seq)
     X_seq = np.transpose(X_seq, (0, 2, 1))  # shape: [B, C, T]
     return X_seq, y_seq
-
-
-from torch.optim.lr_scheduler import StepLR
 
 def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torch.cuda.is_available() else "cpu"):
     X_seq, y_seq = reshape_for_cnn(X, y, window_size, video_boundaries)
@@ -343,7 +341,6 @@ if __name__ == '__main__':
 
         logging.info("Training CNN model...")
         print("Training CNN model...")
-        # 注意：这里需要提供 video_boundaries 列表，与原始数据对齐
         # 使用预处理返回的 video_boundaries
         acc = train_cnn(X, y, window_size=10, video_boundaries=video_boundaries)
         all_accuracies.append((f"CNN-{i}", acc))
@@ -365,7 +362,6 @@ if __name__ == '__main__':
     plt.xticks(rotation=45, ha="right")
     for i, v in enumerate(accuracies):
         plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10)
-
     plt.tight_layout()
     plt.show()
     logging.info("Training complete.")
