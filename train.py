@@ -1,4 +1,6 @@
 import os
+
+import matplotlib
 import pandas as pd
 import numpy as np
 import logging
@@ -474,15 +476,17 @@ if __name__ == '__main__':
     names = [x[0] for x in all_scores]
     scores = [x[1] for x in all_scores]
 
-    # 使用 Seaborn 绘制条形图
+    # 使用 Matplotlib 绘制条形图
+    zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
     plt.figure(figsize=(12, 8))
     sns.barplot(x=names, y=scores, palette="Blues_d")
-    plt.title('Model Comparison - F1-score for Different Methods', fontsize=16)
-    plt.xlabel('Model and Method', fontsize=12)
-    plt.ylabel('F1-score', fontsize=12)
+    plt.title('模型比对 - 不同方法下 F1-score', fontsize=16, fontproperties=zhfont1)
+    plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
+    plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
     plt.xticks(rotation=45, ha="right")
     for i, v in enumerate(scores):
-        plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10)
+        plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
     plt.tight_layout()
+    plt.savefig('benchmark.svg')
     plt.show()
     logging.info("Training complete.")

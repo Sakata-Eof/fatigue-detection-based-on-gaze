@@ -1,9 +1,11 @@
-# @article{Cheng2021Survey,
-#          title={Appearance-based Gaze Estimation With Deep Learning: A Review and Benchmark},
-# author={Yihua Cheng and Haofei Wang and Yiwei Bao and Feng Lu},
-# journal={arXiv preprint arXiv:2104.12668},
-# year={2021}
-# }
+'''
+@article{Cheng2021Survey,
+         title={Appearance-based Gaze Estimation With Deep Learning: A Review and Benchmark},
+author={Yihua Cheng and Haofei Wang and Yiwei Bao and Feng Lu},
+journal={arXiv preprint arXiv:2104.12668},
+year={2021}
+}
+'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
