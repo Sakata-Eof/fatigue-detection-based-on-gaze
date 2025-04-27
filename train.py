@@ -13,7 +13,7 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, accuracy_score, f1_score
+from sklearn.metrics import classification_report, f1_score
 
 import torch
 import torch.nn as nn
@@ -181,10 +181,10 @@ def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torc
             all_labels.extend(yb.numpy())
 
     all_preds = np.array(all_preds) > 0.5
-    f1 = f1_score(all_labels, all_preds)
-    logging.info(f"Final CNN Test F1-score: {f1:.4f}")
+    score = f1_score(all_labels, all_preds)
+    logging.info(f"Final CNN Test F1-score: {score:.4f}")
 
-    return f1
+    return score
 # 交叉验证版CNN训练
 def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" if torch.cuda.is_available() else "cpu", n_splits=5):
     X_seq, y_seq = reshape_for_cnn(X, y, window_size, video_boundaries)
