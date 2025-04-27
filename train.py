@@ -25,6 +25,7 @@ from torch.optim.lr_scheduler import StepLR
 logging.basicConfig(
     filename='model_training.log',
     level=logging.INFO,
+    filemode='w',
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
