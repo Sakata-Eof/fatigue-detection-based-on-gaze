@@ -265,6 +265,7 @@ def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" i
                 patience_counter += 1
                 if patience_counter >= patience:
                     print(f"Early stopping at epoch {epoch+1} in fold {fold+1}")
+                    logging.info(f"Early stopping at epoch {epoch+1} in fold {fold+1}")
                     break
             scheduler.step()
 
@@ -281,6 +282,7 @@ def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" i
         all_preds = np.array(all_preds) > 0.5
         f1 = f1_score(all_labels, all_preds)
         print(f"Fold {fold+1} F1-score: {f1:.4f}")
+        logging.info(f"Fold {fold+1} F1-score: {f1:.4f}")
         f1_scores.append(f1)
         # 清理模型文件
         try:
@@ -289,6 +291,7 @@ def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" i
             pass
 
     print(f"\nAverage CNN F1-score across {n_splits} folds: {np.mean(f1_scores):.4f}")
+    logging.info(f"\nAverage CNN F1-score across {n_splits} folds: {np.mean(f1_scores):.4f}")
     return np.mean(f1_scores)
 
 def PreProcess(X, y, measure=0, standardize=True):
