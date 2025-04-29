@@ -1,3 +1,4 @@
+import csv
 import os
 
 import matplotlib
@@ -366,10 +367,11 @@ def PreProcess(X, y, measure=0, standardize=True):
             processed_videos.append((features, labels))
 
         elif measure == 3:
-            video_df["velocity_x"] = video_df["gaze_x"].diff().fillna(0)
-            video_df["velocity_y"] = video_df["gaze_y"].diff().fillna(0)
-            video_df["acceleration_x"] = video_df["velocity_x"].diff().fillna(0)
-            video_df["acceleration_y"] = video_df["velocity_y"].diff().fillna(0)
+            video_df["frame_diff"] = video_df["frame"].diff().fillna(0)
+            video_df["velocity_x"] = (video_df["gaze_x"].diff().fillna(0) / video_df["frame_diff"]).fillna(0)
+            video_df["velocity_y"] = (video_df["gaze_y"].diff().fillna(0) / video_df["frame_diff"]).fillna(0)
+            video_df["acceleration_x"] = (video_df["velocity_x"].diff().fillna(0) / video_df["frame_diff"]).fillna(0)
+            video_df["acceleration_y"] = (video_df["velocity_y"].diff().fillna(0) / video_df["frame_diff"]).fillna(0)
             features = video_df[["frame", "gaze_x", "gaze_y", "velocity_x", "velocity_y", "acceleration_x", "acceleration_y"]].values
             labels = video_df["label"].values
             if standardize:
@@ -420,7 +422,7 @@ if __name__ == '__main__':
             'SVC': {
                 'C': [0.1, 1, 10],
                 'gamma': ['scale', 'auto', 0.1, 1],
-                'kernel': ['rbf']
+                'kernel': ['rbf', 'sigmoid', 'linear'],
             },
             'RandomForest': {
                 'n_estimators': [50, 100, 200],
@@ -480,17 +482,31 @@ if __name__ == '__main__':
     names = [x[0] for x in all_scores]
     scores = [x[1] for x in all_scores]
 
-    # 使用 Matplotlib 绘制条形图
-    zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
-    plt.figure(figsize=(12, 8))
-    sns.barplot(x=names, y=scores, palette="Blues_d")
-    plt.title('模型比对 - 不同方法下 F1-score', fontsize=16, fontproperties=zhfont1)
-    plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
-    plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
-    plt.xticks(rotation=45, ha="right")
-    for i, v in enumerate(scores):
-        plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
-    plt.tight_layout()
-    plt.savefig('benchmark.svg')
-    plt.show()
-    logging.info("Training complete.")
+logging.info("Training complete.")
+# 保存得分到文件
+with open("scores.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    writer.writerow(["Model-Measure", "F1-score"])
+    for name, score in all_scores:
+        writer.writerow([name, score])
+
+# 从文件读取得分并排序
+df_scores = pd.read_csv("scores.csv")
+df_scores = df_scores.sort_values(by="F1-score", ascending=False)
+
+names = df_scores["Model-Measure"].tolist()
+scores = df_scores["F1-score"].tolist()
+
+# 使用 Matplotlib 绘制条形图
+zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
+plt.figure(figsize=(12, 8))
+sns.barplot(x=names, y=scores, palette="Blues_d")
+plt.title('模型比对 - 不同方法下 F1-score', fontsize=16, fontproperties=zhfont1)
+plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
+plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
+plt.xticks(rotation=45, ha="right")
+for i, v in enumerate(scores):
+    plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
+plt.tight_layout()
+plt.savefig('benchmark.svg')
+plt.show()

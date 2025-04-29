@@ -1,4 +1,6 @@
 import os
+
+import matplotlib
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # 用于三维绘图
@@ -6,6 +8,8 @@ from mpl_toolkits.mplot3d import Axes3D  # 用于三维绘图
 # 设置数据路径
 data_path = 'output'
 
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
 # 创建3D图
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
@@ -32,33 +36,33 @@ for video_id in range(10):  # 假设视频序号为 0-9
 
 # 合并所有数据
 all_data = pd.concat(all_data, ignore_index=True)
-
+zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
 # 绘制三维散点图
 for label in ['f', 'nf']:
     # 选择数据
     if label == 'f':
         label_data = all_data[all_data['label'] == 'fatigue']
-        label = 'fatigue'
+        label = '疲劳'
     else:
         label_data = all_data[all_data['label'] == 'not fatigue']
-        label = 'not fatigue'
+        label = '不疲劳'
 
     # 设置颜色：'f' 为红色，'nf' 为白色
-    color = 'r' if label == 'fatigue' else 'b'
+    color = 'r' if label == '疲劳' else 'b'
 
     # 绘制散点图
     ax.scatter(label_data['gaze_x'], label_data['gaze_y'], label_data['frame'], c=color, label=label, alpha=0.6)
 
 # 设置轴标签
-ax.set_xlabel('Gaze X')
-ax.set_ylabel('Gaze Y')
-ax.set_zlabel('Frame')
+ax.set_xlabel('X', fontproperties=zhfont1)
+ax.set_ylabel('Y', fontproperties=zhfont1)
+ax.set_zlabel('帧', fontproperties=zhfont1)
 
 # 设置标题
-ax.set_title('3D Scatter Plot of Gaze Data (f and nf)')
+ax.set_title('注视点坐标的3D散点图', fontproperties=zhfont1)
 
 # 添加图例
 ax.legend()
-
+plt.savefig('scatter.svg')
 # 显示图形
 plt.show()

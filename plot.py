@@ -1,27 +1,25 @@
+# 从文件读取得分并排序
+import matplotlib
 import pandas as pd
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 import seaborn as sns
 
-# 加载数据
-data = pd.read_csv('output/1/f/gaze.txt', delim_whitespace=True, header=None, names=['frame', 'gaze_x', 'gaze_y'])
+df_scores = pd.read_csv("scores.csv")
+df_scores = df_scores.sort_values(by="F1-score", ascending=False)
 
-# 设置 Seaborn 风格
-sns.set(style="darkgrid")
+names = df_scores["Model-Measure"].tolist()
+scores = df_scores["F1-score"].tolist()
 
-# 创建一个画布和子图
-plt.figure(figsize=(10, 6))
-
-# 绘制 gaze_x 和 gaze_y 随着帧数变化的线型图
-plt.plot(data['frame'], data['gaze_x'], label='Gaze X', color='blue')
-plt.plot(data['frame'], data['gaze_y'], label='Gaze Y', color='red')
-
-# 设置图表的标题和标签
-plt.title('Gaze Point Over Frames', fontsize=16)
-plt.xlabel('Frame', fontsize=12)
-plt.ylabel('Gaze Coordinates', fontsize=12)
-
-# 添加图例
-plt.legend()
-
-# 显示图表
+# 使用 Matplotlib 绘制条形图
+zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
+plt.figure(figsize=(12, 8))
+sns.barplot(x=names, y=scores, palette="Blues_d")
+plt.title('模型比对 - 不同方法下 F1-score', fontsize=16, fontproperties=zhfont1)
+plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
+plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
+plt.xticks(rotation=45, ha="right")
+for i, v in enumerate(scores):
+    plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
+plt.tight_layout()
+plt.savefig('benchmark.svg')
 plt.show()
