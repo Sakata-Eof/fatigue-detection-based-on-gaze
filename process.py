@@ -48,11 +48,11 @@ def GazeEstimationPerVideo(path):
         ).astype(np.float32)
         rects = torch.from_numpy(rects).unsqueeze(0).to(device)
         # 图像预处理
-        face = cv2.imread(os.path.join(path, frameCount, "face.jpg"))
+        face = cv2.imread(str(os.path.join(path, frameCount, "face.jpg")))
         face = preprocess_image(face, target_size=(224,224)).to(device)
-        left = cv2.imread(os.path.join(path, frameCount, "left.jpg"))
+        left = cv2.imread(str(os.path.join(path, frameCount, "left.jpg")))
         left = preprocess_image(left, target_size=(112,112)).to(device)
-        right = cv2.imread(os.path.join(path, frameCount, "right.jpg"))
+        right = cv2.imread(str(os.path.join(path, frameCount, "right.jpg")))
         right = preprocess_image(right, target_size=(112,112), flip = True).to(device)#右眼翻转
         with torch.no_grad():
             # 生成注视点坐标
