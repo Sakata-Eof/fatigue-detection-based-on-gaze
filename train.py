@@ -22,6 +22,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim.lr_scheduler import StepLR
 
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
+from xgboost import XGBClassifier
+from sklearn.neural_network import MLPClassifier
+
 # 配置日志
 logging.basicConfig(
     filename='model_training.log',
@@ -415,14 +420,18 @@ if __name__ == '__main__':
             'SVC': SVC(),
             'RandomForest': RandomForestClassifier(),
             'LogisticRegression': LogisticRegression(),
-            'KNeighbors': KNeighborsClassifier()
+            'KNeighbors': KNeighborsClassifier(),
+            'LightGBM': LGBMClassifier(),
+            'CatBoost': CatBoostClassifier(verbose=0),
+            'XGBoost': XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+            'MLPClassifier': MLPClassifier(max_iter=500)
         }
 
         param_grids = {
             'SVC': {
                 'C': [0.1, 1, 10],
                 'gamma': ['scale', 'auto', 0.1, 1],
-                'kernel': ['rbf', 'sigmoid', 'linear'],
+                'kernel': ['rbf', 'sigmoid'],
             },
             'RandomForest': {
                 'n_estimators': [50, 100, 200],
@@ -437,6 +446,26 @@ if __name__ == '__main__':
             'KNeighbors': {
                 'n_neighbors': [3, 5, 7],
                 'weights': ['uniform', 'distance']
+            },
+            'LightGBM': {
+                'num_leaves': [31, 50],
+                'learning_rate': [0.01, 0.1],
+                'n_estimators': [100, 200]
+            },
+            'CatBoost': {
+                'iterations': [100, 200],
+                'depth': [6, 10],
+                'learning_rate': [0.01, 0.1]
+            },
+            'XGBoost': {
+                'n_estimators': [100, 200],
+                'max_depth': [6, 10],
+                'learning_rate': [0.01, 0.1]
+            },
+            'MLPClassifier': {
+                'hidden_layer_sizes': [(50,), (100,)],
+                'activation': ['relu', 'tanh'],
+                'solver': ['adam', 'sgd']
             }
         }
 
@@ -506,7 +535,7 @@ plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
 plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
 plt.xticks(rotation=45, ha="right")
 for i, v in enumerate(scores):
-    plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
+    plt.text(i, v + 0.01, f'{v:.2f}', ha='center', va='bottom', fontsize=8, fontproperties=zhfont1)
 plt.tight_layout()
 plt.savefig('benchmark.svg')
 plt.show()

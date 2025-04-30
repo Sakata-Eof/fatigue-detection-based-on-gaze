@@ -19,7 +19,7 @@ plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
 plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
 plt.xticks(rotation=45, ha="right")
 for i, v in enumerate(scores):
-    plt.text(i, v + 0.01, f'{v:.4f}', ha='center', va='bottom', fontsize=10, fontproperties=zhfont1)
+    plt.text(i, v + 0.01, f'{v:.2f}', ha='center', va='bottom', fontsize=8, fontproperties=zhfont1)
 plt.tight_layout()
 plt.savefig('benchmark.svg')
 plt.show()
