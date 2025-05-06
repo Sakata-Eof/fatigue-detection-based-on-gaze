@@ -12,9 +12,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, f1_score
+from sklearn.metrics import classification_report, f1_score, accuracy_score
 
 import torch
 import torch.nn as nn
@@ -24,8 +23,6 @@ from torch.optim.lr_scheduler import StepLR
 
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
-from xgboost import XGBClassifier
-from sklearn.neural_network import MLPClassifier
 
 # 配置日志
 logging.basicConfig(
@@ -188,15 +185,15 @@ def train_cnn(X, y, window_size=60, video_boundaries=None, device="cuda" if torc
             all_labels.extend(yb.numpy())
 
     all_preds = np.array(all_preds) > 0.5
-    score = f1_score(all_labels, all_preds)
-    logging.info(f"Final CNN Test F1-score: {score:.4f}")
+    score = accuracy_score(all_labels, all_preds)
+    logging.info(f"Final CNN Test Accuracy: {score:.4f}")
 
     return score
 # 交叉验证版CNN训练
 def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" if torch.cuda.is_available() else "cpu", n_splits=5):
     X_seq, y_seq = reshape_for_cnn(X, y, window_size, video_boundaries)
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    f1_scores = []
+    acc_scores = []
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(X_seq)):
         print(f"\nCNN Fold {fold+1}/{n_splits}")
@@ -286,19 +283,19 @@ def train_cnn_kfold(X, y, window_size=60, video_boundaries=None, device="cuda" i
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(yb.numpy())
         all_preds = np.array(all_preds) > 0.5
-        f1 = f1_score(all_labels, all_preds)
-        print(f"Fold {fold+1} F1-score: {f1:.4f}")
-        logging.info(f"Fold {fold+1} F1-score: {f1:.4f}")
-        f1_scores.append(f1)
+        Acc = accuracy_score(all_labels, all_preds)
+        print(f"Fold {fold+1} Accuracy: {Acc:.4f}")
+        logging.info(f"Fold {fold+1} Accuracy: {Acc:.4f}")
+        acc_scores.append(Acc)
         # 清理模型文件
         try:
             os.remove(best_model_path)
         except:
             pass
 
-    print(f"\nAverage CNN F1-score across {n_splits} folds: {np.mean(f1_scores):.4f}")
-    logging.info(f"\nAverage CNN F1-score across {n_splits} folds: {np.mean(f1_scores):.4f}")
-    return np.mean(f1_scores)
+    print(f"\nAverage CNN Accuracy across {n_splits} folds: {np.mean(acc_scores):.4f}")
+    logging.info(f"\nAverage CNN Accuracy across {n_splits} folds: {np.mean(acc_scores):.4f}")
+    return np.mean(acc_scores)
 
 def PreProcess(X, y, measure=0, standardize=True):
     """
@@ -419,12 +416,9 @@ if __name__ == '__main__':
         models = {
             'SVC': SVC(),
             'RandomForest': RandomForestClassifier(),
-            'LogisticRegression': LogisticRegression(),
             'KNeighbors': KNeighborsClassifier(),
             'LightGBM': LGBMClassifier(),
-            'CatBoost': CatBoostClassifier(verbose=0),
-            'XGBoost': XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
-            'MLPClassifier': MLPClassifier(max_iter=500)
+            'CatBoost': CatBoostClassifier(verbose=0)
         }
 
         param_grids = {
@@ -437,11 +431,6 @@ if __name__ == '__main__':
                 'n_estimators': [50, 100, 200],
                 'max_depth': [None, 10, 20],
                 'min_samples_split': [2, 5, 10]
-            },
-            'LogisticRegression': {
-                'C': [0.1, 1, 10],
-                'solver': ['lbfgs', 'liblinear'],
-                'penalty': ['l2']
             },
             'KNeighbors': {
                 'n_neighbors': [3, 5, 7],
@@ -456,16 +445,6 @@ if __name__ == '__main__':
                 'iterations': [100, 200],
                 'depth': [6, 10],
                 'learning_rate': [0.01, 0.1]
-            },
-            'XGBoost': {
-                'n_estimators': [100, 200],
-                'max_depth': [6, 10],
-                'learning_rate': [0.01, 0.1]
-            },
-            'MLPClassifier': {
-                'hidden_layer_sizes': [(50,), (100,)],
-                'activation': ['relu', 'tanh'],
-                'solver': ['adam', 'sgd']
             }
         }
 
@@ -484,25 +463,25 @@ if __name__ == '__main__':
             best_models[model_name] = best_model
 
             y_pred = best_model.predict(X_test)
-            f1 = f1_score(y_test, y_pred)
-            logging.info(f"F1-score for {model_name} in measure {i+1}: {f1}")
-            print(f"F1-score for {model_name} in measure {i+1}: {f1}")
+            Acc = accuracy_score(y_test, y_pred)
+            logging.info(f"Accuracy for {model_name} in measure {i+1}: {Acc}")
+            print(f"Accuracy for {model_name} in measure {i+1}: {Acc}")
             logging.info(f"Classification Report for {model_name} in measure {i+1}:\n{classification_report(y_test, y_pred)}")
             print(f"Classification Report for {model_name} in measure {i+1}:\n{classification_report(y_test, y_pred)}")
-            model_scores.append((f"{model_name}-{i+1}", f1))  # 保存模型和方法编号
+            model_scores.append((f"{model_name}-{i+1}", Acc))  # 保存模型和方法编号
         logging.info("\n--- Model Comparison ---")
         for model_name, model in best_models.items():
             y_pred = model.predict(X_test)
-            logging.info(f"{model_name} F1-score in measure {i+1}: {f1_score(y_test, y_pred)}")
-            print(f"{model_name} F1-score in measure {i+1}: {f1_score(y_test, y_pred)}")
+            logging.info(f"{model_name} Accuracy in measure {i+1}: {accuracy_score(y_test, y_pred)}")
+            print(f"{model_name} Accuracy in measure {i+1}: {accuracy_score(y_test, y_pred)}")
 
         logging.info("Training CNN model...")
         print("Training CNN model...")
         # 使用预处理返回的 video_boundaries
-        f1 = train_cnn_kfold(X, y, window_size=10, video_boundaries=video_boundaries)
-        all_scores.append((f"CNN-{i+1}", f1))
-        logging.info(f"F1-score for CNN in measure {i+1}: {f1}")
-        print(f"F1-score for CNN in measure {i+1}: {f1}")
+        Acc = train_cnn_kfold(X, y, window_size=10, video_boundaries=video_boundaries)
+        all_scores.append((f"CNN-{i+1}", Acc))
+        logging.info(f"Acc for CNN in measure {i+1}: {Acc}")
+        print(f"Acc for CNN in measure {i+1}: {Acc}")
 
         all_scores.extend(model_scores)  # 将当前测量结果加入所有结果
         logging.info(f"measure {i+1} Training complete.")
@@ -515,27 +494,27 @@ logging.info("Training complete.")
 # 保存得分到文件
 with open("scores.csv", "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
-    writer.writerow(["Model-Measure", "F1-score"])
+    writer.writerow(["Model-Measure", "Accuracy"])
     for name, score in all_scores:
         writer.writerow([name, score])
 
 # 从文件读取得分并排序
 df_scores = pd.read_csv("scores.csv")
-df_scores = df_scores.sort_values(by="F1-score", ascending=False)
+df_scores = df_scores.sort_values(by="Accuracy", ascending=False)
 
 names = df_scores["Model-Measure"].tolist()
-scores = df_scores["F1-score"].tolist()
+scores = df_scores["Accuracy"].tolist()
 
 # 使用 Matplotlib 绘制条形图
 zhfont1 = matplotlib.font_manager.FontProperties(fname="MapleMonoNormalNL-NF-CN-Regular.ttf")
 plt.figure(figsize=(12, 8))
 sns.barplot(x=names, y=scores, palette="Blues_d")
-plt.title('模型比对 - 不同方法下 F1-score', fontsize=16, fontproperties=zhfont1)
+plt.title('模型比对 - 不同方法下准确率', fontsize=16, fontproperties=zhfont1)
 plt.xlabel('模型-方法', fontsize=12, fontproperties=zhfont1)
-plt.ylabel('F1-score', fontsize=12, fontproperties=zhfont1)
+plt.ylabel('准确率', fontsize=12, fontproperties=zhfont1)
 plt.xticks(rotation=45, ha="right")
 for i, v in enumerate(scores):
-    plt.text(i, v + 0.01, f'{v:.2f}', ha='center', va='bottom', fontsize=8, fontproperties=zhfont1)
+    plt.text(i, v + 0.01, f'{v:.3f}', ha='center', va='bottom', fontsize=8, fontproperties=zhfont1)
 plt.tight_layout()
-plt.savefig('benchmark.svg')
+plt.savefig('benchmark\\benchmark.svg')
 plt.show()
