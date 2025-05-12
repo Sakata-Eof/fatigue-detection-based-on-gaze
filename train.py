@@ -414,7 +414,7 @@ if __name__ == '__main__':
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)# 测试集占0.5
 
         models = {
-            'SVC': SVC(),
+            'SVM': SVC(),
             'RandomForest': RandomForestClassifier(),
             'KNeighbors': KNeighborsClassifier(),
             'LightGBM': LGBMClassifier(),
@@ -422,7 +422,7 @@ if __name__ == '__main__':
         }
 
         param_grids = {
-            'SVC': {
+            'SVM': {
                 'C': [0.1, 1, 10],
                 'gamma': ['scale', 'auto', 0.1, 1],
                 'kernel': ['rbf', 'sigmoid'],

@@ -43,20 +43,28 @@ for label in ['f', 'nf']:
     if label == 'f':
         label_data = all_data[all_data['label'] == 'fatigue']
         label = '疲劳'
+        x_offset = 0  # 疲劳点的 x 坐标偏移量
+        y_offset = 0  # 疲劳点的 y 坐标偏移量
     else:
         label_data = all_data[all_data['label'] == 'not fatigue']
         label = '不疲劳'
+        x_offset = -1  # 疲劳点的 x 坐标偏移量
+        y_offset = -1  # 疲劳点的 y 坐标偏移量
 
-    # 设置颜色：'f' 为红色，'nf' 为白色
+    # 设置颜色：'f' 为红色，'nf' 为蓝色
     color = 'r' if label == '疲劳' else 'b'
 
-    # 绘制散点图
-    ax.scatter(label_data['gaze_x'], label_data['gaze_y'], label_data['frame'], c=color, label=label, alpha=0.6)
+    # 绘制散点图，添加 z 坐标偏移
+    ax.scatter(label_data['gaze_x']+x_offset, label_data['gaze_y']+y_offset, label_data['frame'],
+               c=color, label=label, alpha=0.6, s=10)
 
 # 设置轴标签
 ax.set_xlabel('X', fontproperties=zhfont1)
 ax.set_ylabel('Y', fontproperties=zhfont1)
 ax.set_zlabel('帧', fontproperties=zhfont1)
+
+# 设置投影方向
+ax.view_init(azim=150, elev = 30)  # elev 是仰角，azim 是方位角
 
 # 设置标题
 ax.set_title('注视点坐标的3D散点图', fontproperties=zhfont1)
