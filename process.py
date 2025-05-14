@@ -1,14 +1,15 @@
 import os
 
 import cv2
+import numpy as np
+import torch
+import torch.nn as nn
 
 import model
-import numpy as np
-import torch.nn as nn
-import torch
+
 picturePath = "pictures"
 outputPath = "output"
-#加载模型
+# 加载模型
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = model.model()
 net = nn.DataParallel(net)
@@ -18,11 +19,17 @@ net = net.module
 net.to(device)
 net.eval()
 
+
 # 生成rects特征
 def normalize_box(box, frame_size):
     x, y, w, h = box
-    return [int(w) / int(frame_size[0]), int(h)/ int(frame_size[1]),
-            int(x) / int(frame_size[0]), int(y) / int(frame_size[1])]
+    return [
+        int(w) / int(frame_size[0]),
+        int(h) / int(frame_size[1]),
+        int(x) / int(frame_size[0]),
+        int(y) / int(frame_size[1]),
+    ]
+
 
 def preprocess_image(img, target_size, flip=False):
     # 图像预处理函数， flip：是否水平翻转
@@ -33,8 +40,9 @@ def preprocess_image(img, target_size, flip=False):
     img = img / 255.0
     return torch.tensor(img.transpose(2, 0, 1)).unsqueeze(0).float()
 
+
 def GazeEstimationPerVideo(path):
-    file = open(os.path.join(path,"rects.txt"), 'r')
+    file = open(os.path.join(path, "rects.txt"), "r")
     lines = file.readlines()
     for line in lines:
         frameCount = line.split(" ")[0]
@@ -42,18 +50,20 @@ def GazeEstimationPerVideo(path):
         # 矩形框标准化
         rects = line.split(" ")[1:]
         rects = np.array(
-            normalize_box(tuple(rects[0:4]), tuple(rects[-2:]))+
-            normalize_box(tuple(rects[4:8]), tuple(rects[-2:]))+
-            normalize_box(tuple(rects[8:12]), tuple(rects[-2:]))
+            normalize_box(tuple(rects[0:4]), tuple(rects[-2:]))
+            + normalize_box(tuple(rects[4:8]), tuple(rects[-2:]))
+            + normalize_box(tuple(rects[8:12]), tuple(rects[-2:]))
         ).astype(np.float32)
         rects = torch.from_numpy(rects).unsqueeze(0).to(device)
         # 图像预处理
         face = cv2.imread(str(os.path.join(path, frameCount, "face.jpg")))
-        face = preprocess_image(face, target_size=(224,224)).to(device)
+        face = preprocess_image(face, target_size=(224, 224)).to(device)
         left = cv2.imread(str(os.path.join(path, frameCount, "left.jpg")))
-        left = preprocess_image(left, target_size=(112,112)).to(device)
+        left = preprocess_image(left, target_size=(112, 112)).to(device)
         right = cv2.imread(str(os.path.join(path, frameCount, "right.jpg")))
-        right = preprocess_image(right, target_size=(112,112), flip = True).to(device)#右眼翻转
+        right = preprocess_image(right, target_size=(112, 112), flip=True).to(
+            device
+        )  # 右眼翻转
         with torch.no_grad():
             # 生成注视点坐标
             gaze = net(left, right, face, rects)
@@ -61,20 +71,21 @@ def GazeEstimationPerVideo(path):
         print(gaze)
         outFile = open(os.path.join(outputPath, "gaze.txt"), "a")
         # 保存格式：帧  注视点坐标x  注视点坐标y
-        outFile.write(" ".join([frameCount, str(gaze[0]), str(gaze[1])])+"\n")
+        outFile.write(" ".join([frameCount, str(gaze[0]), str(gaze[1])]) + "\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     persons = os.listdir(picturePath)
     persons.sort()
     for person in persons:
         # 逐人处理，先处理疲劳再不疲劳
         print(f"Processing person No.{person}, fatigue.")
-        outputPath = os.path.join("output", person,"f")
+        outputPath = os.path.join("output", person, "f")
         if not os.path.exists(outputPath):
             os.makedirs(outputPath)
-        GazeEstimationPerVideo(os.path.join(picturePath, person,"f"))
+        GazeEstimationPerVideo(os.path.join(picturePath, person, "f"))
         print(f"Processing person No.{person}, not fatigue.")
         outputPath = os.path.join("output", person, "nf")
         if not os.path.exists(outputPath):
             os.makedirs(outputPath)
-        GazeEstimationPerVideo(os.path.join(picturePath, person,"nf"))
+        GazeEstimationPerVideo(os.path.join(picturePath, person, "nf"))
