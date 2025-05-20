@@ -49,21 +49,16 @@ for label in ["f", "nf"]:
     if label == "f":
         label_data = all_data[all_data["label"] == "fatigue"]
         label = "疲劳"
-        x_offset = 0  # 疲劳点的 x 坐标偏移量
-        y_offset = 0  # 疲劳点的 y 坐标偏移量
     else:
         label_data = all_data[all_data["label"] == "not fatigue"]
         label = "不疲劳"
-        x_offset = -1  # 疲劳点的 x 坐标偏移量
-        y_offset = -1  # 疲劳点的 y 坐标偏移量
-
     # 设置颜色：'f' 为红色，'nf' 为蓝色
     color = "r" if label == "疲劳" else "b"
 
-    # 绘制散点图，添加 z 坐标偏移
+    # 绘制散点图
     ax.scatter(
-        label_data["gaze_x"] + x_offset,
-        label_data["gaze_y"] + y_offset,
+        label_data["gaze_x"],
+        label_data["gaze_y"],
         label_data["frame"],
         c=color,
         label=label,
