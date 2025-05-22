@@ -47,15 +47,15 @@ for i in range(4):
     models = list(measure_i_dict.keys())
     pd_mi = pd.DataFrame(
         measure_i_dict.items(), columns=["Model", "Accuracy"]
-    ).sort_values(by="Accuracy", ascending=False)
+    ).sort_values(by="Model", ascending=False)
     names = pd_mi["Model"].tolist()
     scores = pd_mi["Accuracy"].tolist()
     plt.figure(figsize=(12, 8))
     sns.barplot(x=names, y=scores, palette="Reds", width=0.5)  # 调整柱子宽度
     sns.despine()  # 去掉上面和右面的边框
     # plt.title(f'模型比对 - 方法{i+1}下准确率', fontsize = 18, fontproperties=zhfont1)
-    plt.xlabel("模型", fontsize=18, fontproperties=zhfont1)
-    plt.ylabel("准确率", fontsize=18, fontproperties=zhfont1)
+    # plt.xlabel("模型", fontsize=24, fontproperties=zhfont1)
+    # plt.ylabel("准确率", fontsize=24, fontproperties=zhfont1)
     for j, v in enumerate(scores):
         plt.text(
             j,
@@ -63,11 +63,11 @@ for i in range(4):
             f"{v:.3f}",
             ha="center",
             va="bottom",
-            fontsize=18,
+            fontsize=32,
             fontproperties=zhfont1,
         )
     plt.tight_layout()
-    plt.xticks(fontsize=18)
+    plt.xticks(fontsize=20)
     plt.savefig(f"benchmark\\benchmark-measure{i+1}.svg")
     plt.show()
 for model in models:
@@ -77,7 +77,7 @@ for model in models:
             model_dict[f"Measure {mm.split('-')[1]}"] = dic[mm]
     pd_mi = pd.DataFrame(
         model_dict.items(), columns=["Measure", "Accuracy"]
-    ).sort_values(by="Accuracy", ascending=False)
+    ).sort_values(by="Measure", ascending=True)
     names = pd_mi["Measure"].tolist()
     scores = pd_mi["Accuracy"].tolist()
     plt.figure(figsize=(12, 8))
@@ -85,7 +85,7 @@ for model in models:
     sns.despine()  # 去掉上面和右面的边框
     # plt.title(f'{model}在不同方法下准确率', fontsize = 18, fontproperties=zhfont1)
     # plt.xlabel('方法', fontsize=18, fontproperties=zhfont1)
-    plt.ylabel("准确率", fontsize=18, fontproperties=zhfont1)
+    # plt.ylabel("准确率", fontsize=24, fontproperties=zhfont1)
     for i, v in enumerate(scores):
         plt.text(
             i,
@@ -93,10 +93,10 @@ for model in models:
             f"{v:.3f}",
             ha="center",
             va="bottom",
-            fontsize=18,
+            fontsize=32,
             fontproperties=zhfont1,
         )
     plt.tight_layout()
-    plt.xticks(fontsize=18)
+    plt.xticks(fontsize=24)
     plt.savefig(f"benchmark\\benchmark-{model}.svg")
     plt.show()

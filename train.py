@@ -1,28 +1,25 @@
 import csv
+import logging
 import os
 
 import matplotlib
-import pandas as pd
 import numpy as np
-import logging
+import pandas as pd
 import seaborn as sns
-
-from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, f1_score, accuracy_score
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from torch.optim.lr_scheduler import StepLR
-
-from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from matplotlib import pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.svm import SVC
+from torch.optim.lr_scheduler import StepLR
+from torch.utils.data import DataLoader, TensorDataset
 
 # 配置日志
 logging.basicConfig(
@@ -591,41 +588,41 @@ if __name__ == "__main__":
     names = [x[0] for x in all_scores]
     scores = [x[1] for x in all_scores]
 
-logging.info("Training complete.")
-# 保存得分到文件
-with open("scores.csv", "w", newline="", encoding="utf-8") as f:
-    writer = csv.writer(f)
-    writer.writerow(["Model-Measure", "Accuracy"])
-    for name, score in all_scores:
-        writer.writerow([name, score])
+    logging.info("Training complete.")
+    # 保存得分到文件
+    with open("scores.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Model-Measure", "Accuracy"])
+        for name, score in all_scores:
+            writer.writerow([name, score])
 
-# 从文件读取得分并排序
-df_scores = pd.read_csv("scores.csv")
-df_scores = df_scores.sort_values(by="Accuracy", ascending=False)
+    # 从文件读取得分并排序
+    df_scores = pd.read_csv("scores.csv")
+    df_scores = df_scores.sort_values(by="Accuracy", ascending=False)
 
-names = df_scores["Model-Measure"].tolist()
-scores = df_scores["Accuracy"].tolist()
+    names = df_scores["Model-Measure"].tolist()
+    scores = df_scores["Accuracy"].tolist()
 
-# 使用 Matplotlib 绘制条形图
-zhfont1 = matplotlib.font_manager.FontProperties(
-    fname="MapleMonoNormalNL-NF-CN-Regular.ttf"
-)
-plt.figure(figsize=(12, 8))
-sns.barplot(x=names, y=scores, palette="Blues_d")
-plt.title("模型比对 - 不同方法下准确率", fontsize=16, fontproperties=zhfont1)
-plt.xlabel("模型-方法", fontsize=12, fontproperties=zhfont1)
-plt.ylabel("准确率", fontsize=12, fontproperties=zhfont1)
-plt.xticks(rotation=45, ha="right")
-for i, v in enumerate(scores):
-    plt.text(
-        i,
-        v + 0.01,
-        f"{v:.3f}",
-        ha="center",
-        va="bottom",
-        fontsize=8,
-        fontproperties=zhfont1,
+    # 使用 Matplotlib 绘制条形图
+    zhfont1 = matplotlib.font_manager.FontProperties(
+        fname="MapleMonoNormalNL-NF-CN-Regular.ttf"
     )
-plt.tight_layout()
-plt.savefig("benchmark\\benchmark.svg")
-plt.show()
+    plt.figure(figsize=(12, 8))
+    sns.barplot(x=names, y=scores, palette="Blues_d")
+    plt.title("模型比对 - 不同方法下准确率", fontsize=16, fontproperties=zhfont1)
+    plt.xlabel("模型-方法", fontsize=12, fontproperties=zhfont1)
+    plt.ylabel("准确率", fontsize=12, fontproperties=zhfont1)
+    plt.xticks(rotation=45, ha="right")
+    for i, v in enumerate(scores):
+        plt.text(
+            i,
+            v + 0.01,
+            f"{v:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontproperties=zhfont1,
+        )
+    plt.tight_layout()
+    plt.savefig("benchmark\\benchmark.svg")
+    plt.show()
